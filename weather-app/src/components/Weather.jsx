@@ -79,13 +79,13 @@ const Weather = () => {
         <>
 
         <img src={weatherData.icon} className='w-40 mx-8' alt="" />
-        <p className='text-white text-4xl leading-none'>16°C</p>
+        <p className='text-white text-4xl leading-none'>{weatherData.temperature} °C</p>
         <p className='text-white text-4xl'>{weatherData.location}</p>
         <div className="flex flex-row m-4 w-full mx-10 text-white justify-between">
             <div className="flex items-center gap-3 text-xl">
                 <img src={humidity} className='w-6 mx-2' alt="" />
                 <div>
-                    <p>{weatherData.temperature}°C</p>
+                    <p>{weatherData.humidity}</p>
                     <span className='block text-xl'>Humidity</span>
                 </div>
             </div>
