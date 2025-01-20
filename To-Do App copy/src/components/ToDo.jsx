@@ -24,31 +24,51 @@ function ToDo() {
   const [todoList, setToDoList] = useState([]);
   const [user, setUser] = useState(null);
   const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const inputRef = useRef();
   const emailRef = useRef();
   const passwordRef = useRef();
 
-  // Check if "Remember Me" is enabled and set persistence
+  // Initialize rememberMe state from localStorage
   useEffect(() => {
-    const rememberFlag = localStorage.getItem("rememberMe") === "true";
-
-    if (rememberFlag) {
-      setPersistence(auth, browserLocalPersistence).catch((error) =>
-        console.error("Error setting persistence:", error)
-      );
-    } else {
-      setPersistence(auth, browserSessionPersistence).catch((error) =>
-        console.error("Error setting persistence:", error)
-      );
-    }
+    const remembered = localStorage.getItem("rememberMe") === "true";
+    setRememberMe(remembered);
+    setIsLoading(false);
   }, []);
 
-  // Automatically log in the user if they're already authenticated
+  // Handle persistence changes when rememberMe changes
+  useEffect(() => {
+    if (!isLoading) {
+      const setPersistenceType = async () => {
+        try {
+          await setPersistence(
+            auth, 
+            rememberMe ? browserLocalPersistence : browserSessionPersistence
+          );
+          
+          // Store rememberMe preference
+          if (rememberMe) {
+            localStorage.setItem("rememberMe", "true");
+          } else {
+            localStorage.removeItem("rememberMe");
+          }
+        } catch (error) {
+          console.error("Error setting persistence:", error);
+        }
+      };
+
+      setPersistenceType();
+    }
+  }, [rememberMe, isLoading]);
+
+  // Auth state listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
+      } else {
+        setUser(null);
       }
     });
 
@@ -72,7 +92,6 @@ function ToDo() {
     }
   }, [user]);
 
-  // Add a todo to Firestore
   const add = async () => {
     const inputText = inputRef.current.value.trim();
     if (inputText === "") return;
@@ -83,33 +102,30 @@ function ToDo() {
         text: inputText,
         isComplete: false,
       });
-      inputRef.current.value = ""; // Clear the input field
+      inputRef.current.value = "";
     } catch (error) {
-      console.error("Error adding todo:", error.message);
+      console.error("Error adding todo:", error);
     }
   };
 
-  // Toggle todo completion
   const toggle = async (id, currentStatus) => {
     try {
-      const todoRef = doc(db, "todos", id); // Get the document reference
-      await updateDoc(todoRef, { isComplete: !currentStatus }); // Update the field
+      const todoRef = doc(db, "todos", id);
+      await updateDoc(todoRef, { isComplete: !currentStatus });
     } catch (error) {
-      console.error("Error toggling todo:", error.message);
+      console.error("Error toggling todo:", error);
     }
   };
 
-  // Delete a todo
   const deleteTodo = async (id) => {
     try {
-      const todoRef = doc(db, "todos", id); // Get the document reference
-      await deleteDoc(todoRef); // Delete the document
+      const todoRef = doc(db, "todos", id);
+      await deleteDoc(todoRef);
     } catch (error) {
-      console.error("Error deleting todo:", error.message);
+      console.error("Error deleting todo:", error);
     }
   };
 
-  // Handle user login
   const login = async () => {
     const email = emailRef.current.value;
     const password = passwordRef.current.value;
@@ -117,28 +133,34 @@ function ToDo() {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       setUser(userCredential.user);
-
-      // Save "Remember Me" flag
-      if (rememberMe) {
-        localStorage.setItem("rememberMe", "true");
-      } else {
-        localStorage.removeItem("rememberMe");
-      }
     } catch (error) {
       console.error("Login failed:", error.message);
+      // You might want to show this error to the user
     }
   };
 
-  // Handle user logout
   const logout = async () => {
     try {
       await signOut(auth);
       setUser(null);
-      localStorage.removeItem("rememberMe"); // Clear rememberMe flag
+      
+      // Clear form fields
+      if (emailRef.current) emailRef.current.value = "";
+      if (passwordRef.current) passwordRef.current.value = "";
+      
+      // Only clear rememberMe if it was previously set
+      if (rememberMe) {
+        setRememberMe(false);
+        localStorage.removeItem("rememberMe");
+      }
     } catch (error) {
-      console.error("Logout failed:", error.message);
+      console.error("Logout failed:", error);
     }
   };
+
+  if (isLoading) {
+    return <div>Loading...</div>; // Or your preferred loading indicator
+  }
 
   return (
     <div className="bg-white place-self-center w-11/12 max-w-md flex flex-col p-7 min-h-[550px] rounded-xl">
@@ -163,7 +185,6 @@ function ToDo() {
           <button onClick={logout}>Logout</button>
           <h1 className="text-center">Welcome, {user.email}</h1>
 
-          {/* Input Section */}
           <div className="flex items-center my-7 bg-gray-200 rounded-full">
             <input
               ref={inputRef}
@@ -179,7 +200,6 @@ function ToDo() {
             </button>
           </div>
 
-          {/* ToDo List */}
           <div>
             {todoList.map((item) => (
               <ToDoItems
